@@ -3,204 +3,223 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import Comments from "@/components/Comments";
 
 export default function Dashboard() {
   const router = useRouter();
-
   const [user, setUser] = useState(null);
   const [articles, setArticles] = useState([]);
+  const [topArticles, setTopArticles] = useState([]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [commentText, setCommentText] = useState({});
-  const [comments, setComments] = useState({});
-
-  useEffect(() => {
-    getUser();
-    fetchArticles();
-  }, []);
+  const [notifications, setNotifications] = useState([]);
 
   // 🔐 GET USER
-  const getUser = async () => {
-    const { data } = await supabase.auth.getUser();
-    setUser(data.user);
-  };
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
 
-  // 📄 FETCH ARTICLES + LIKE COUNT
+      if (!data.user) {
+        router.push("/login");
+      } else {
+        setUser(data.user);
+      }
+    };
+
+    getUser();
+  }, []);
+
+  // 📄 FETCH ARTICLES
   const fetchArticles = async () => {
     const { data } = await supabase
       .from("articles")
-      .select("*, likes(count)");
+      .select("*")
+      .order("id", { ascending: false });
 
     setArticles(data || []);
   };
 
+  // 🏆 TOP 5 ARTICLES (by likes)
+  const fetchTopArticles = async () => {
+    const { data } = await supabase
+      .from("articles")
+      .select("*")
+      .order("likes", { ascending: false })
+      .limit(5);
+
+    setTopArticles(data || []);
+  };
+
+  // 🔔 NOTIFICATIONS
+  const fetchNotifications = async () => {
+  const { data } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  setNotifications(data || []);
+};
+  useEffect(() => {
+    if (user) {
+      fetchArticles();
+      fetchTopArticles();
+      fetchNotifications();
+    }
+  }, [user]);
+
   // ➕ CREATE ARTICLE
   const createArticle = async () => {
-  const { data, error } = await supabase.auth.getUser();
+    if (!title || !content) return;
 
-  if (!data?.user) {
-    alert("You are not logged in!");
-    return;
-  }
-
-  await supabase.from("articles").insert({
-    title,
-    content,
-    user_id: data.user.id,
-  });
-
-  setTitle("");
-  setContent("");
-  fetchArticles();
-};
-
-  // ❤️ LIKE ARTICLE
-  const likeArticle = async (articleId) => {
-    const { data: userData } = await supabase.auth.getUser();
-
-    const { error } = await supabase.from("likes").insert({
-      user_id: userData.user.id,
-      article_id: articleId,
+    await supabase.from("articles").insert({
+      title,
+      content,
+      user_id: user.id,
+      likes: 0,
     });
 
-    if (error) alert("Already liked!");
+    setTitle("");
+    setContent("");
+    fetchArticles();
+    fetchTopArticles();
+  };
+
+  // ❤️ LIKE
+  const likeArticle = async (id) => {
+    await supabase.rpc("increment_likes", { row_id: id });
+
+    await supabase.from("notifications").insert({
+      user_id: user.id,
+      message: "Someone liked an article ❤️",
+    });
 
     fetchArticles();
-  };
-
-  // 💬 FETCH COMMENTS
-  const fetchComments = async (articleId) => {
-    const { data } = await supabase
-      .from("comments")
-      .select("*")
-      .eq("article_id", articleId)
-      .order("created_at");
-
-    setComments((prev) => ({ ...prev, [articleId]: data || [] }));
-  };
-
-  // 💬 ADD COMMENT / REPLY
-  const addComment = async (articleId, parentId = null) => {
-    const { data: userData } = await supabase.auth.getUser();
-
-    await supabase.from("comments").insert({
-      content: commentText[articleId],
-      user_id: userData.user.id,
-      article_id: articleId,
-      parent_id: parentId,
-    });
-
-    setCommentText((prev) => ({ ...prev, [articleId]: "" }));
-    fetchComments(articleId);
+    fetchTopArticles();
   };
 
   // 🚪 LOGOUT
   const logout = async () => {
     await supabase.auth.signOut();
-    router.push("/");
+    router.push("/login");
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 text-white p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-blue-950 text-white flex">
 
-      {/* HEADER */}
-      <div className="flex justify-between mb-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <button onClick={logout} className="text-red-400">Logout</button>
-      </div>
+      {/* SIDEBAR */}
+      <div className="w-64 bg-white/5 backdrop-blur-md border-r border-white/10 p-5 flex flex-col justify-between">
+        <div>
+          <h2 className="text-xl font-bold mb-6">ML Hub</h2>
 
-      {/* PROFILE */}
-      <div className="mb-6 bg-white/10 p-4 rounded-xl">
-        <p className="text-gray-400">Logged in as:</p>
-        <p>{user?.email}</p>
-      </div>
+          {/* PROFILE */}
+          <div className="bg-white/10 p-4 rounded-xl mb-6">
+            <p className="text-sm text-gray-300">Logged in as</p>
+            <p className="font-semibold break-all">
+              {user?.email}
+            </p>
+          </div>
 
-      {/* CREATE ARTICLE */}
-      <div className="mb-6 bg-white/10 p-4 rounded-xl">
-        <input
-          placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full mb-2 p-2 text-black rounded"
-        />
-        <textarea
-          placeholder="Content"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          className="w-full mb-2 p-2 text-black rounded"
-        />
+          {/* TOP ARTICLES */}
+          <div>
+            <h3 className="text-sm text-blue-300 mb-2">
+              Top Articles
+            </h3>
+
+            <div className="space-y-2">
+              {topArticles.map((a) => (
+                <div
+                  key={a.id}
+                  className="text-sm bg-white/10 p-2 rounded-lg"
+                >
+                  {a.title}
+                  <span className="text-pink-400 ml-2">
+                    ❤️ {a.likes || 0}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* LOGOUT */}
         <button
-          onClick={createArticle}
-          className="bg-blue-600 px-4 py-2 rounded"
+          onClick={logout}
+          className="bg-red-500 hover:bg-red-600 p-2 rounded-lg transition"
         >
-          Post Article
+          Logout
         </button>
       </div>
 
-      {/* ARTICLES */}
-      {articles.map((a) => (
-        <div key={a.id} className="bg-white/10 p-5 rounded-xl mb-6">
+      {/* MAIN CONTENT */}
+      <div className="flex-1 p-6 max-w-4xl mx-auto">
 
-          <h2 className="text-xl font-bold">{a.title}</h2>
-          <p className="text-gray-300 mt-2">{a.content}</p>
+        <h1 className="text-3xl font-bold mb-6">
+          Dashboard
+        </h1>
 
-          {/* LIKE */}
+        {/* CREATE */}
+        <div className="bg-white/5 p-5 rounded-2xl mb-6 border border-white/10">
+          <input
+            className="w-full p-3 mb-3 rounded-lg bg-white/10 border border-white/10"
+            placeholder="Title..."
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+
+          <textarea
+            className="w-full p-3 mb-3 rounded-lg bg-white/10 border border-white/10"
+            placeholder="Write something..."
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+          />
+
           <button
-            onClick={() => likeArticle(a.id)}
-            className="mt-3 text-blue-400"
+            onClick={createArticle}
+            className="bg-blue-500 px-4 py-2 rounded-lg hover:bg-blue-600"
           >
-            ❤️ {a.likes?.[0]?.count || 0}
+            Post
           </button>
-
-          {/* LOAD COMMENTS */}
-          <button
-            onClick={() => fetchComments(a.id)}
-            className="ml-4 text-sm text-gray-400"
-          >
-            Load Comments
-          </button>
-
-          {/* COMMENT INPUT */}
-          <div className="mt-4">
-            <input
-              placeholder="Write comment..."
-              value={commentText[a.id] || ""}
-              onChange={(e) =>
-                setCommentText((prev) => ({
-                  ...prev,
-                  [a.id]: e.target.value,
-                }))
-              }
-              className="w-full p-2 text-black rounded"
-            />
-
-            <button
-              onClick={() => addComment(a.id)}
-              className="bg-green-500 px-3 py-1 mt-2 rounded"
-            >
-              Comment
-            </button>
-          </div>
-
-          {/* COMMENTS */}
-          <div className="mt-4">
-            {(comments[a.id] || []).map((c) => (
-              <div key={c.id} className="ml-2 border-l pl-2 mt-2">
-
-                <p>{c.content}</p>
-
-                {/* REPLY */}
-                <button
-                  onClick={() => addComment(a.id, c.id)}
-                  className="text-sm text-blue-400"
-                >
-                  Reply
-                </button>
-              </div>
-            ))}
-          </div>
         </div>
-      ))}
+
+        {/* ARTICLES */}
+        <div className="space-y-6">
+          {articles.map((a) => (
+            <div
+              key={a.id}
+              className="bg-white/5 p-5 rounded-2xl border border-white/10"
+            >
+              <h3 className="text-xl font-semibold">{a.title}</h3>
+              <p className="text-gray-300 mb-3">{a.content}</p>
+
+              <button
+                onClick={() => likeArticle(a.id)}
+                className="text-pink-400 mb-3"
+              >
+                ❤️ Like ({a.likes || 0})
+              </button>
+
+              <Comments articleId={a.id} user={user} />
+            </div>
+          ))}
+        </div>
+
+        {/* NOTIFICATIONS */}
+        <div className="mt-10">
+          <h2 className="text-lg text-blue-300 mb-3">
+            Notifications
+          </h2>
+
+          {notifications.map((n) => (
+            <div
+              key={n.id}
+              className="bg-white/5 p-3 rounded-lg mb-2"
+            >
+              {n.message}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
