@@ -11,14 +11,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
 
   const login = async () => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+  if (!email || !password) {
+    alert("Enter email and password");
+    return;
+  }
 
-    if (error) alert(error.message);
-    else router.push("/dashboard");
-  };
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    console.log(error);
+    alert(error.message);
+  } else {
+    router.push("/dashboard");
+  }
+};
 
   const signup = async () => {
     const { error } = await supabase.auth.signUp({
