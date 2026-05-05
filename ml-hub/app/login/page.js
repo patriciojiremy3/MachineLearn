@@ -4,94 +4,108 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
-export default function LoginPage() {
+export default function AuthPage() {
   const router = useRouter();
 
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const login = async () => {
-  if (!email || !password) {
-    alert("Enter email and password");
-    return;
-  }
+  const handleAuth = async () => {
+    setLoading(true);
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+    if (isLogin) {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-  if (error) {
-    console.log(error);
-    alert(error.message);
-  } else {
-    router.push("/dashboard");
-  }
-};
+      setLoading(false);
 
-  const signup = async () => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+      if (error) alert(error.message);
+      else router.push("/dashboard");
+    } else {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
-    if (error) alert(error.message);
-    else alert("Account created!");
+      setLoading(false);
+
+      if (error) alert(error.message);
+      else {
+        alert("Account created! Check your email.");
+        setIsLogin(true);
+      }
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1e3a8a] to-[#020617] relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-800 via-blue-600 to-blue-400">
 
-      {/* 🌌 Background Glow */}
-      <div className="absolute w-72 h-72 bg-blue-500 opacity-30 blur-3xl top-10 left-10"></div>
-      <div className="absolute w-72 h-72 bg-purple-500 opacity-30 blur-3xl bottom-10 right-10"></div>
+      <div className="w-full max-w-md p-8 rounded-2xl 
+        bg-white/10 backdrop-blur-xl border border-white/20 
+        shadow-[0_0_40px_rgba(0,150,255,0.4)] text-white">
 
-      {/* 💎 Glass Card */}
-      <div className="backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl rounded-2xl p-8 w-[340px] text-white">
-
+        {/* Title */}
         <h1 className="text-3xl font-bold text-center mb-2">
-          Welcome Back
+          {isLogin ? "Welcome Back" : "Create Account"}
         </h1>
-        <p className="text-center text-gray-300 mb-6 text-sm">
-          Login to your account
+
+        <p className="text-center text-sm text-blue-100 mb-6">
+          {isLogin ? "Login to your account" : "Sign up to get started"}
         </p>
 
-        {/* ✉️ Email */}
+        {/* Inputs */}
         <input
           type="email"
           placeholder="Email"
-          value={email}
+          className="w-full p-3 mb-4 rounded-lg 
+          bg-white/20 border border-white/30 
+          placeholder-blue-100 text-white
+          focus:outline-none focus:ring-2 focus:ring-blue-300"
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full mb-3 p-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
 
-        {/* 🔒 Password */}
         <input
           type="password"
           placeholder="Password"
-          value={password}
+          className="w-full p-3 mb-6 rounded-lg 
+          bg-white/20 border border-white/30 
+          placeholder-blue-100 text-white
+          focus:outline-none focus:ring-2 focus:ring-blue-300"
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full mb-5 p-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
 
-        {/* 🔵 Login */}
+        {/* Button */}
         <button
-          onClick={login}
-          className="w-full bg-gradient-to-r from-blue-500 to-blue-700 hover:opacity-90 transition p-3 rounded-lg font-semibold shadow-lg mb-3"
+          onClick={handleAuth}
+          disabled={loading}
+          className="w-full py-3 rounded-lg font-semibold
+          bg-blue-400 hover:bg-blue-500 transition
+          shadow-md hover:shadow-blue-300/50"
         >
-          Login
+          {loading
+            ? "Loading..."
+            : isLogin
+            ? "Login"
+            : "Sign Up"}
         </button>
 
-        {/* 🟢 Signup */}
-        <button
-          onClick={signup}
-          className="w-full bg-gradient-to-r from-green-400 to-green-600 hover:opacity-90 transition p-3 rounded-lg font-semibold shadow-lg"
-        >
-          Create Account
-        </button>
+        {/* Toggle */}
+        <p className="text-sm text-center mt-6 text-blue-100">
+          {isLogin ? "Don’t have an account?" : "Already have an account?"}{" "}
+          <span
+            onClick={() => setIsLogin(!isLogin)}
+            className="font-semibold cursor-pointer hover:underline text-white"
+          >
+            {isLogin ? "Sign up" : "Login"}
+          </span>
+        </p>
 
         {/* Footer */}
-        <p className="text-center text-xs text-gray-400 mt-5">
+        <p className="text-xs text-center mt-4 text-blue-200">
           Machine Learning Hub
         </p>
       </div>

@@ -1,25 +1,34 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
-export default function Home() {
+export default function HomePage() {
   const router = useRouter();
 
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getUser();
+  return (
+    <div className="min-h-screen flex items-center justify-center 
+    bg-gradient-to-br from-blue-900 via-blue-700 to-blue-500 text-white">
 
-      if (data?.user) {
-        router.push("/dashboard");
-      } else {
-        router.push("/login");
-      }
-    };
+      <div className="text-center max-w-xl px-6">
 
-    checkUser();
-  }, []);
+        <h1 className="text-5xl font-bold mb-4">
+          Machine Learning Hub
+        </h1>
 
-  return null;
+        <p className="text-lg text-blue-100 mb-8">
+          Explore, learn, and build amazing ML projects.
+        </p>
+
+        <button
+          onClick={() => router.push("/login")}
+          className="px-8 py-3 rounded-xl text-lg font-semibold
+          bg-white text-blue-700 hover:bg-blue-100 transition
+          shadow-lg"
+        >
+          🚀 Let's Get Started
+        </button>
+
+      </div>
+    </div>
+  );
 }
