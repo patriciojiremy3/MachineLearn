@@ -39,6 +39,31 @@ export default function Dashboard() {
 
     setArticles(data || []);
   };
+  // 🔥 DELETE ARTICLE
+const handleDelete = async (articleId) => {
+  if (!user) return;
+
+  try {
+    const { error } = await supabase
+      .from("articles")
+      .delete()
+      .eq("id", articleId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    // update UI
+    setArticles((prev) =>
+      prev.filter((a) => a.id !== articleId)
+    );
+
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   // 🏆 TOP 5 ARTICLES (by likes)
   const fetchTopArticles = async () => {
@@ -159,17 +184,36 @@ const deleteNotification = async (id) => {
 };
 
   // ❤️ LIKE
-  const handleLike = async (id) => {
-    await supabase.rpc("increment_likes", { row_id: id });
+ const handleLike = async (articleId) => {
+  const { data: existing } = await supabase
+    .from("likes")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("article_id", articleId)
+    .maybeSingle();
 
+  if (existing) {
+    await supabase
+      .from("likes")
+      .delete()
+      .eq("id", existing.id);
+  } else {
+    await supabase
+      .from("likes")
+      .insert({
+        user_id: user.id,
+        article_id: articleId,
+      });
+    // 🔔 Optional notification
     await supabase.from("notifications").insert({
       user_id: user.id,
       message: "Someone liked an article ❤️",
     });
+  }
 
-    fetchArticles();
-    fetchTopArticles();
-  };
+  fetchArticles();
+  fetchTopArticles();
+};
   const handleShare = async (article) => {
   const url = `${window.location.origin}/article/${article.id}`;
   try {
@@ -371,6 +415,14 @@ const deleteNotification = async (id) => {
               >
                 ❤️ {a.likes || 0}
               </button>
+              {a.user_id === user.id && (
+                <button
+                  onClick={() => handleDelete(a.id)}
+                  className="text-red-500/80 hover:bg-red-600 text-white px-3 py-1 rounded-lg transition duration-200 shadow-md"
+                >
+                  Delete
+                </button>
+              )}
               <button
   onClick={() => handleShare(a)}
   className="text-blue-400 hover:text-blue-300 ml-2"
